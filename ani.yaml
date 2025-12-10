@@ -7,33 +7,35 @@ training:
   # path to the dataset
   dspath: butadiene_dataset.pkl
   batch_size: 50 # number of molecular configurations per batch
-  max_epochs: 1000 # number of training epochs
+  max_epochs: 300 # number of training epochs
   nbatch_per_epoch: 20 # number of batches per epoch
   nbatch_per_validation: 2 # number of batches used for validation at each epoch
   ema_decay: 0.99 # exponential moving average decay for the model parameters (<=0 means no EMA)
   default_loss_type: mse # default loss type for the training
 
+  optimizer: adam
   weight_decay: 1.e-4 # weight decay for the optimizer (L2 regularization)
   decay_targets: [energies] # list of modules and/or paramters for which the weight decay is applied
   energy_terms: [energy] # output keys used to form the total energy
 
   ## learning rate schedule (default is a cosine one-cycle schedule)
-  init_lr: 2.e-4 # initial learning rate
+  init_lr: 5.e-4 # initial learning rate
   lr: 5.e-3 # maximum learning rate
   final_lr: 1.e-6 # final learning rate
+
+  ## clip gradients that are too large
+  gradient_clipping: 1000.
+  clipping_range: "global"
 
   ## definition of the loss functions
   loss:
     e: # energy loss (this key is just an identifier for this part of the loss)
-      key: total_energy # key of the output used for the loss
+      key: etot_ensemble # key of the output used for the loss
       ref: energy # key of the reference from the dataset
-      weight: 1. # weight of this term in the total loss
+      weight: 20. # weight of this term in the total loss
       energy_unit: kcalpermol # unit of the reference -> model will be trained in atomic units so ref will be converted (but metrics will be shown in the unit of the dataset)
-    ebis: # energy loss (this key is just an identifier for this part of the loss)
-      key: total_energy_bis # key of the output used for the loss
-      ref: energy # key of the reference from the dataset
-      weight: 1. # weight of this term in the total loss
-      energy_unit: kcalpermol # unit of the reference -> model will be trained in atomic units so ref will be converted (but metrics will be shown in the unit of the dataset)
+      type: ensemble_crps
+      ensemble_axis: -1
     f:
       key: forces
       ref: forces
@@ -78,32 +80,24 @@ model:
       species_index_key: species_index
       species_order: [H, C]
       activation: partial(celu,alpha=0.1)
-      output_dim: 2
+      output_dim: 64
       hidden_neurons: [256, 192, 160]
       input_key: embedding
       squeeze: True
+
+    # compute mean and variance of atomic energy distribution
+    energies_stat:
+      module_name: ensemble_stat
+      key: energies 
+      mean_key: energy
     
-    split_energies:
-      module_name: split
-      key: energies
-      output_keys: [energy,energy_bis]
-
-    etot_bis:
+    # sum energy ensemble over the atoms
+    etot_ensemble:
       module_name: scatter_system
-      key: energy_bis
-      output_key: total_energy_bis
-
-    ## compute mean and variance of atomic energy distribution
-    #energies_stat:
-    #  module_name: ensemble_stat
-    #  key: energies 
-    #
-    ## sum energy ensemble over the atoms
-    #etot_ensemble:
-    #  module_name: scatter_system
-    #  key: energies
-    #  output_key: etot_ensemble
-    #
-    #etot_stat:
-    #  module_name: ensemble_stat
-    #  key: etot_ensemble
+      key: energies
+      output_key: etot_ensemble
+    
+    # compute mean and variance of total energy distribution
+    etot_stat:
+      module_name: ensemble_stat
+      key: etot_ensemble
