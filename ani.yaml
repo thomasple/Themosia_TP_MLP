@@ -79,7 +79,8 @@ model:
       module_name: SPECIES_INDEX_NET
       species_index_key: species_index
       species_order: [H, C]
-      activation: partial(celu,alpha=0.1)
+      activation: partial(celu, alpha=0.1)
+      use_bias: False
       output_dim: 64
       hidden_neurons: [256, 192, 160]
       input_key: embedding
